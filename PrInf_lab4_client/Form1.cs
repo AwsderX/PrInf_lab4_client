@@ -40,7 +40,7 @@ namespace PrInf_lab4_client
             textBox1.Text += "Модуль = " + n.ToString() + Environment.NewLine;
 
             // Генерация случайного затемняющего множителя
-            BigInteger r = GenerateRandomNumber(n);
+            BigInteger r = GenerateBlindingFactor(n);
             // Умножение сообщения на затемняющий множитель
             BigInteger blindedMessage = message * r % n;
             textBox1.Text += "Склеенное сообщение = " + blindedMessage + Environment.NewLine;
@@ -98,6 +98,25 @@ namespace PrInf_lab4_client
             string output = process.StandardOutput.ReadToEnd();
             textBox1.Text += output + Environment.NewLine;
             process.WaitForExit();
+        }
+
+        public BigInteger GenerateBlindingFactor(BigInteger n)
+        {
+            BigInteger r;
+
+            do
+            {
+                r = GenerateRandomNumber(n); // Генерация случайного числа в диапазоне от 1 до n-1
+            } while (!IsCoprime(r, n)); // Проверка на взаимную простоту чисел r и n
+
+            return r;
+        }
+
+        public bool IsCoprime(BigInteger a, BigInteger b)
+        {
+            BigInteger gcd = BigInteger.GreatestCommonDivisor(a, b);
+
+            return gcd.Equals(BigInteger.One);
         }
 
         public BigInteger GenerateRandomNumber(BigInteger n)
