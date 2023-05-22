@@ -31,38 +31,15 @@ namespace PrInf_lab4_client
             string publicKeyOutput = ExecuteOpenSSLCommand($"rsa -pubin -in {publicKeyPath} -noout -text");
             BigInteger e, n, d;
             ExtractExponents(privateKeyOutput, publicKeyOutput, out e, out n, out d);
-            //ExtractExponents(publicKeyOutput, out e, out n);
 
-            //// Чтение открытого ключа из файла
-            //string publicKeyContents = File.ReadAllText(publicKeyPath);
-            //// Парсинг открытого ключа в PEM формате
-            //PemReader reader = new PemReader(new StringReader(publicKeyContents));
-            //RsaKeyParameters publicKeyParams = (RsaKeyParameters)reader.ReadObject();
-            //// Извлечение значения e (открытая экспонента)
-            //BigInteger e = new BigInteger(publicKeyParams.Exponent.ToByteArrayUnsigned());
-            //textBox1.Text += "Экспонента = " + e.ToString() + Environment.NewLine;
-            //// Извлечение значения n (модуль)
-            //BigInteger n = new BigInteger(publicKeyParams.Modulus.ToByteArrayUnsigned());
-            //textBox1.Text += "Модуль = " + n.ToString() + Environment.NewLine;
-
-            // Генерация случайного затемняющего множителя (blinding factor)
-            //Random random = new Random();
-            // BigInteger r = GenerateRandomBigInteger(random, BigInteger.One, n - BigInteger.One);
-            BigInteger r = GenerateBlindingFactor(n);
             // Генерация случайного затемняющего множителя
-            //BigInteger r = 200;
+            BigInteger r = GenerateBlindingFactor(n);
             // Умножение сообщения на затемняющий множитель
             BigInteger blindedMessage = message * ModPow(r,e,n) % n;
 
             textBox1.Text += "Склеенное сообщение = " + blindedMessage + Environment.NewLine;
 
-            // Чтение закрытого ключа из файла
-            //string privateKeyContents = File.ReadAllText(privateKeyPath);
-            //// Парсинг закрытого ключа в PEM формате
-            //PemReader reader2 = new PemReader(new StringReader(privateKeyContents));
-            //RsaPrivateCrtKeyParameters privateKeyParams = (RsaPrivateCrtKeyParameters)reader2.ReadObject();
-            //// Извлечение значения d (закрытая экспонента)
-            //BigInteger privateKey_d = new BigInteger(privateKeyParams.Exponent.ToByteArrayUnsigned());
+
             // Подписание склеенного сообщения
             BigInteger blindedSignature = ModPow(blindedMessage, d, n);
             textBox1.Text += "Подписанное сообщение = " + blindedSignature + Environment.NewLine;
@@ -77,6 +54,7 @@ namespace PrInf_lab4_client
             string signatureFilePath = "signature.bin";
             File.WriteAllBytes(signatureFilePath, unblindedSignature.ToByteArray());
 
+            // Проверка подписи с использованием OpenSSL
             if (ModPow(unblindedSignature, e, n) == message) 
             {
                 textBox1.Text = "Проверка пройдёна";
@@ -85,9 +63,6 @@ namespace PrInf_lab4_client
             {
                 textBox1.Text = $"Проверка провалена {ModPow(unblindedSignature, e, n)}   {message}";
             }
-            // Проверка подписи с использованием OpenSSL
-            //string opensslCommand = $"dgst -sha256 -verify {publicKeyPath} -signature {signatureFilePath} {messageFilePath}";
-            //textBox1.Text += ExecuteOpenSSLCommand(opensslCommand);
 
         }
 
@@ -124,43 +99,6 @@ namespace PrInf_lab4_client
             return gcd.Equals(BigInteger.One);
         }
 
-
-        // Метод для генерации маскировочного множителя
-        //public BigInteger GenerateRandomBigInteger(BigInteger m)
-        //{
-        //    BigInteger r;
-        //    do
-        //    {
-        //        r = new BigInteger(m.ToByteArray());
-        //        using (var random = new RNGCryptoServiceProvider())
-        //        {
-        //            byte[] bytes = new byte[m.ToByteArray().Length];
-        //            do
-        //            {
-        //                random.GetBytes(bytes);
-        //                r = new BigInteger(bytes);
-        //            } while (r >= m || !BigInteger.One.Equals(BigInteger.GreatestCommonDivisor(r, m)));
-        //        }
-        //    } while (r >= m || !BigInteger.One.Equals(BigInteger.GreatestCommonDivisor(r, m))); // Проверка на взаимно простоту с модулем
-        //    return r;
-        //}
-
-        //private BigInteger GenerateRandomBigInteger(Random random, BigInteger minValue, BigInteger maxValue)
-        //{
-        //    int maxBytes = Math.Max(minValue.ToByteArray().Length, maxValue.ToByteArray().Length);
-        //    byte[] randomBytes = new byte[maxBytes];
-        //    BigInteger result;
-
-        //    do
-        //    {
-        //        random.NextBytes(randomBytes);
-        //        randomBytes[randomBytes.Length - 1] &= 0x7F;  // Ensure positive value
-        //        result = new BigInteger(randomBytes);
-        //    }
-        //    while (result <= minValue || result >= maxValue);
-
-        //    return result;
-        //}
         private void ExtractExponents(string output, string output1, out BigInteger e, out BigInteger n, out BigInteger d)
         {
             e = n = d = default;
@@ -193,24 +131,7 @@ namespace PrInf_lab4_client
                 output = output1;
             }
         }
-        //private void ExtractExponents(string output, out BigInteger e, out BigInteger n)
-        //{
-        //    string pattern = @"modulus:\s+([\s\S]+?)publicExponent:";
-        //    Match match = Regex.Match(output, pattern);
-        //    if (match.Success)
-        //    {
-        //        string value = match.Groups[1].Value.Replace(":", "").Replace(" ", "").Replace(Environment.NewLine, "");
-        //        n = BigInteger.Parse(value, System.Globalization.NumberStyles.HexNumber);
-        //    }
 
-        //    pattern = @"publicExponent:\s+([\s\S]+?)privateExponent:";
-        //    match = Regex.Match(output, pattern);
-        //    if (match.Success)
-        //    {
-        //        string value = match.Groups[1].Value.Replace(":", "").Replace(" ", "").Replace(Environment.NewLine, "");
-        //        e = BigInteger.Parse(value, System.Globalization.NumberStyles.HexNumber);
-        //    }
-        //}
         private BigInteger ModPow(BigInteger baseValue, BigInteger exponent, BigInteger modulus)
         {
             BigInteger result = 1;
