@@ -1,5 +1,6 @@
 
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -9,6 +10,8 @@ namespace PrInf_lab4_client
 {
     public partial class Form1 : Form
     {
+        private const int Port = 8888;
+        private const string ServerIpAddress = "127.0.0.1"; // IP-адрес сервера
         public Form1()
         {
             InitializeComponent();
@@ -36,13 +39,26 @@ namespace PrInf_lab4_client
             BigInteger r = GenerateBlindingFactor(n);
             // Умножение сообщения на затемняющий множитель
             BigInteger blindedMessage = message * ModPow(r,e,n) % n;
-
             textBox1.Text += "Склеенное сообщение = " + blindedMessage + Environment.NewLine;
 
 
-            // Подписание склеенного сообщения
-            BigInteger blindedSignature = ModPow(blindedMessage, d, n);
-            textBox1.Text += "Подписанное сообщение = " + blindedSignature + Environment.NewLine;
+            // Установка соединения с сервером
+            TcpClient client = new TcpClient();
+            client.Connect(ServerIpAddress, Port);
+            // Преобразование чисел в массив байтов
+            byte[] number1Bytes = blindedMessage.ToByteArray();
+
+
+            // Отправка данных на сервер
+            NetworkStream stream = client.GetStream();
+            stream.Write(number1Bytes, 0, number1Bytes.Length);
+            Console.WriteLine("Данные успешно отправлены на сервер.");
+
+            // Получение ответа от сервера
+            byte[] responseBytes = new byte[client.ReceiveBufferSize];
+            int bytesRead = stream.Read(responseBytes, 0, responseBytes.Length);
+
+            BigInteger blindedSignature = new BigInteger(responseBytes);
 
             // Снимание затемняющего множителя
             BigInteger unblindedSignature = ModInverse(r, n) * blindedSignature % n;
