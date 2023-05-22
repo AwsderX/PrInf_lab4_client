@@ -86,8 +86,8 @@ namespace PrInf_lab4_client
                 textBox1.Text = $"Проверка провалена {ModPow(unblindedSignature, e, n)}   {message}";
             }
             // Проверка подписи с использованием OpenSSL
-            string opensslCommand = $"dgst -sha256 -verify {publicKeyPath} -signature {signatureFilePath} {messageFilePath}";
-            textBox1.Text += ExecuteOpenSSLCommand(opensslCommand);
+            //string opensslCommand = $"dgst -sha256 -verify {publicKeyPath} -signature {signatureFilePath} {messageFilePath}";
+            //textBox1.Text += ExecuteOpenSSLCommand(opensslCommand);
 
         }
 
