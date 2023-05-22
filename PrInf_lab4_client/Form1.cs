@@ -1,5 +1,4 @@
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.OpenSsl;
+
 using System.Diagnostics;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -47,24 +46,25 @@ namespace PrInf_lab4_client
             //textBox1.Text += "Модуль = " + n.ToString() + Environment.NewLine;
 
             // Генерация случайного затемняющего множителя (blinding factor)
-            Random random = new Random();
-            BigInteger r = GenerateRandomBigInteger(random, BigInteger.One, n - BigInteger.One);
-
+            //Random random = new Random();
+            // BigInteger r = GenerateRandomBigInteger(random, BigInteger.One, n - BigInteger.One);
+            BigInteger r = GenerateBlindingFactor(n);
             // Генерация случайного затемняющего множителя
             //BigInteger r = 200;
             // Умножение сообщения на затемняющий множитель
-            BigInteger blindedMessage = message * r % n;
+            BigInteger blindedMessage = message * ModPow(r,e,n) % n;
+
             textBox1.Text += "Склеенное сообщение = " + blindedMessage + Environment.NewLine;
 
             // Чтение закрытого ключа из файла
-            string privateKeyContents = File.ReadAllText(privateKeyPath);
-            // Парсинг закрытого ключа в PEM формате
-            PemReader reader2 = new PemReader(new StringReader(privateKeyContents));
-            RsaPrivateCrtKeyParameters privateKeyParams = (RsaPrivateCrtKeyParameters)reader2.ReadObject();
-            // Извлечение значения d (закрытая экспонента)
-            BigInteger privateKey_d = new BigInteger(privateKeyParams.Exponent.ToByteArrayUnsigned());
+            //string privateKeyContents = File.ReadAllText(privateKeyPath);
+            //// Парсинг закрытого ключа в PEM формате
+            //PemReader reader2 = new PemReader(new StringReader(privateKeyContents));
+            //RsaPrivateCrtKeyParameters privateKeyParams = (RsaPrivateCrtKeyParameters)reader2.ReadObject();
+            //// Извлечение значения d (закрытая экспонента)
+            //BigInteger privateKey_d = new BigInteger(privateKeyParams.Exponent.ToByteArrayUnsigned());
             // Подписание склеенного сообщения
-            BigInteger blindedSignature = ModPow(blindedMessage, privateKey_d, n);
+            BigInteger blindedSignature = ModPow(blindedMessage, d, n);
             textBox1.Text += "Подписанное сообщение = " + blindedSignature + Environment.NewLine;
 
             // Снимание затемняющего множителя
@@ -77,27 +77,90 @@ namespace PrInf_lab4_client
             string signatureFilePath = "signature.bin";
             File.WriteAllBytes(signatureFilePath, unblindedSignature.ToByteArray());
 
+            if (ModPow(unblindedSignature, e, n) == message) 
+            {
+                textBox1.Text = "Проверка пройдёна";
+            }
+            else
+            {
+                textBox1.Text = $"Проверка провалена {ModPow(unblindedSignature, e, n)}   {message}";
+            }
             // Проверка подписи с использованием OpenSSL
             string opensslCommand = $"dgst -sha256 -verify {publicKeyPath} -signature {signatureFilePath} {messageFilePath}";
             textBox1.Text += ExecuteOpenSSLCommand(opensslCommand);
 
         }
-        private BigInteger GenerateRandomBigInteger(Random random, BigInteger minValue, BigInteger maxValue)
-        {
-            int maxBytes = Math.Max(minValue.ToByteArray().Length, maxValue.ToByteArray().Length);
-            byte[] randomBytes = new byte[maxBytes];
-            BigInteger result;
 
+        // Метод для генерации маскировочного множителя для слепой подписи RSA
+        public static BigInteger GenerateBlindingFactor(BigInteger modulus)
+        {
+            BigInteger blindingFactor;
             do
             {
-                random.NextBytes(randomBytes);
-                randomBytes[randomBytes.Length - 1] &= 0x7F;  // Ensure positive value
-                result = new BigInteger(randomBytes);
-            }
-            while (result <= minValue || result >= maxValue);
-
-            return result;
+                blindingFactor = GenerateRandomBigInteger(modulus);
+            } while (!IsCoprime(blindingFactor, modulus));
+            return blindingFactor;
         }
+
+        // Метод для генерации случайного BigInteger в пределах заданного модуля
+        private static BigInteger GenerateRandomBigInteger(BigInteger modulus)
+        {
+            byte[] randomBytes = new byte[modulus.ToByteArray().Length];
+            using (var rng = new RNGCryptoServiceProvider())
+            {
+                do
+                {
+                    rng.GetBytes(randomBytes);
+                    randomBytes[randomBytes.Length - 1] &= 0x7F; // установка старшего бита в 0, чтобы получить положительное значение
+                } while (new BigInteger(randomBytes) >= modulus);
+            }
+            return new BigInteger(randomBytes);
+        }
+
+        // Метод для проверки взаимной простоты двух чисел
+        private static bool IsCoprime(BigInteger a, BigInteger b)
+        {
+            BigInteger gcd = BigInteger.GreatestCommonDivisor(a, b);
+            return gcd.Equals(BigInteger.One);
+        }
+
+
+        // Метод для генерации маскировочного множителя
+        //public BigInteger GenerateRandomBigInteger(BigInteger m)
+        //{
+        //    BigInteger r;
+        //    do
+        //    {
+        //        r = new BigInteger(m.ToByteArray());
+        //        using (var random = new RNGCryptoServiceProvider())
+        //        {
+        //            byte[] bytes = new byte[m.ToByteArray().Length];
+        //            do
+        //            {
+        //                random.GetBytes(bytes);
+        //                r = new BigInteger(bytes);
+        //            } while (r >= m || !BigInteger.One.Equals(BigInteger.GreatestCommonDivisor(r, m)));
+        //        }
+        //    } while (r >= m || !BigInteger.One.Equals(BigInteger.GreatestCommonDivisor(r, m))); // Проверка на взаимно простоту с модулем
+        //    return r;
+        //}
+
+        //private BigInteger GenerateRandomBigInteger(Random random, BigInteger minValue, BigInteger maxValue)
+        //{
+        //    int maxBytes = Math.Max(minValue.ToByteArray().Length, maxValue.ToByteArray().Length);
+        //    byte[] randomBytes = new byte[maxBytes];
+        //    BigInteger result;
+
+        //    do
+        //    {
+        //        random.NextBytes(randomBytes);
+        //        randomBytes[randomBytes.Length - 1] &= 0x7F;  // Ensure positive value
+        //        result = new BigInteger(randomBytes);
+        //    }
+        //    while (result <= minValue || result >= maxValue);
+
+        //    return result;
+        //}
         private void ExtractExponents(string output, string output1, out BigInteger e, out BigInteger n, out BigInteger d)
         {
             e = n = d = default;
@@ -117,7 +180,7 @@ namespace PrInf_lab4_client
                 if (match.Success)
                 {
                     string value = match.Groups[1].Value.Replace(":", "").Replace(" ", "").Replace(Environment.NewLine, "").Replace("(0x10001)", "");
-                    e = BigInteger.Parse(value, System.Globalization.NumberStyles.HexNumber);
+                    e = BigInteger.Parse(value);
                 }
 
                 pattern = @"privateExponent:\s+([\s\S]+?)prime1:";
